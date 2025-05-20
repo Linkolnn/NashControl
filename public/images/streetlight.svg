@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Base -->
+  <rect x="55" y="100" width="10" height="20" fill="#616161"/>
+  <rect x="50" y="95" width="20" height="5" fill="#757575"/>
+  
+  <!-- Pole -->
+  <rect x="57" y="30" width="6" height="70" fill="#757575"/>
+  
+  <!-- Light Fixture -->
+  <path d="M40 30C40 25 45 20 60 20C75 20 80 25 80 30C80 35 75 40 60 40C45 40 40 35 40 30Z" fill="#9E9E9E"/>
+  <path d="M45 30C45 27 50 24 60 24C70 24 75 27 75 30C75 33 70 36 60 36C50 36 45 33 45 30Z" fill="#FFECB3"/>
+  
+  <!-- Light Rays -->
+  <path d="M60 40L50 50" stroke="#FFC107" stroke-width="2"/>
+  <path d="M60 40L70 50" stroke="#FFC107" stroke-width="2"/>
+  <path d="M60 40L60 55" stroke="#FFC107" stroke-width="2"/>
+  <path d="M60 40L45 45" stroke="#FFC107" stroke-width="2"/>
+  <path d="M60 40L75 45" stroke="#FFC107" stroke-width="2"/>
+  
+  <!-- Broken Glass Effect -->
+  <path d="M55 30L65 35" stroke="#E0E0E0" stroke-width="1"/>
+  <path d="M65 30L55 35" stroke="#E0E0E0" stroke-width="1"/>
+</svg>

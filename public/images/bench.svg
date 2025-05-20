@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Bench Seat -->
+  <rect x="30" y="50" width="60" height="10" fill="#8D6E63"/>
+  <rect x="30" y="60" width="60" height="2" fill="#6D4C41"/>
+  
+  <!-- Bench Legs -->
+  <rect x="35" y="62" width="5" height="20" fill="#5D4037"/>
+  <rect x="80" y="62" width="5" height="20" fill="#5D4037"/>
+  
+  <!-- Bench Back -->
+  <rect x="30" y="30" width="60" height="5" fill="#8D6E63"/>
+  <rect x="30" y="35" width="60" height="2" fill="#6D4C41"/>
+  
+  <!-- Bench Back Supports -->
+  <rect x="35" y="37" width="5" height="13" fill="#5D4037"/>
+  <rect x="80" y="37" width="5" height="13" fill="#5D4037"/>
+  <rect x="57" y="37" width="6" height="13" fill="#5D4037"/>
+  
+  <!-- Broken Part -->
+  <path d="M50 50L60 65" stroke="#8D6E63" stroke-width="3"/>
+  <path d="M65 50L55 65" stroke="#8D6E63" stroke-width="3"/>
+  <path d="M45 30L55 45" stroke="#8D6E63" stroke-width="3"/>
+  
+  <!-- Ground -->
+  <rect x="20" y="82" width="80" height="3" fill="#9E9E9E"/>
+</svg>

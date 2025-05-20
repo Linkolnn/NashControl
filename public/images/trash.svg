@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Trash Pile -->
+  <path d="M30 80C30 70 40 60 60 60C80 60 90 70 90 80C90 90 80 100 60 100C40 100 30 90 30 80Z" fill="#795548"/>
+  
+  <!-- Trash Items -->
+  <rect x="45" y="55" width="15" height="25" rx="2" fill="#607D8B"/>
+  <rect x="65" y="50" width="20" height="15" rx="2" fill="#9E9E9E"/>
+  <ellipse cx="50" cy="75" rx="10" ry="5" fill="#9E9E9E"/>
+  <ellipse cx="75" cy="70" rx="8" ry="4" fill="#607D8B"/>
+  <rect x="40" y="65" width="10" height="15" rx="2" fill="#FFA000"/>
+  <rect x="70" y="65" width="12" height="10" rx="2" fill="#F57F17"/>
+  
+  <!-- Flies -->
+  <circle cx="40" cy="50" r="2" fill="#212121"/>
+  <circle cx="45" cy="45" r="2" fill="#212121"/>
+  <circle cx="50" cy="48" r="2" fill="#212121"/>
+  <circle cx="80" cy="55" r="2" fill="#212121"/>
+  <circle cx="85" cy="50" r="2" fill="#212121"/>
+  <circle cx="75" cy="45" r="2" fill="#212121"/>
+  
+  <!-- Fly Wings -->
+  <path d="M38 48L36 46" stroke="#212121" stroke-width="1"/>
+  <path d="M42 48L44 46" stroke="#212121" stroke-width="1"/>
+  <path d="M43 43L41 41" stroke="#212121" stroke-width="1"/>
+  <path d="M47 43L49 41" stroke="#212121" stroke-width="1"/>
+  <path d="M48 46L46 44" stroke="#212121" stroke-width="1"/>
+  <path d="M52 46L54 44" stroke="#212121" stroke-width="1"/>
+  <path d="M78 53L76 51" stroke="#212121" stroke-width="1"/>
+  <path d="M82 53L84 51" stroke="#212121" stroke-width="1"/>
+  <path d="M83 48L81 46" stroke="#212121" stroke-width="1"/>
+  <path d="M87 48L89 46" stroke="#212121" stroke-width="1"/>
+  <path d="M73 43L71 41" stroke="#212121" stroke-width="1"/>
+  <path d="M77 43L79 41" stroke="#212121" stroke-width="1"/>
+</svg>
