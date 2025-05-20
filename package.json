@@ -15,7 +15,6 @@
     "vue-router": "^4.5.1",
     "pinia": "^2.1.7",
     "@pinia/nuxt": "^0.5.1",
-    "@nuxtjs/yandex-maps": "^1.2.0",
     "sass": "^1.69.5",
     "sass-loader": "^13.3.2",
     "@nuxtjs/style-resources": "^2.0.0",

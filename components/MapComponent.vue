@@ -190,61 +190,63 @@ const generateId = () => {
   return Date.now().toString()
 }
 
+// Получаем доступ к плагину Яндекс Карт
+const { $initYandexMap } = useNuxtApp()
+
 // Initialize map when component is mounted
 onMounted(async () => {
   if (typeof window !== 'undefined') {
-    // Load Yandex Maps API
-    if (!window.ymaps) {
-      const script = document.createElement('script')
-      script.src = `https://api-maps.yandex.ru/2.1/?apikey=${config.public.yandexMapsApiKey}&lang=ru_RU`
-      script.async = true
-      script.onload = initMap
-      document.head.appendChild(script)
-    } else {
-      initMap()
+    // Инициализируем карту с помощью плагина
+    try {
+      // Создаем карту с помощью нашего плагина
+      map = await $initYandexMap('map', {
+        center: [60.118891, 64.790629], // Центр карты
+        zoom: 14,
+        controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
+      })
+      
+      // Инициализируем кластеризатор после создания карты
+      initClusterer()
+      
+      // Fetch problems data
+      await problemsStore.fetchProblems()
+      
+      // Добавляем проблемы на карту
+      addProblemsToMap()
+    } catch (error) {
+      console.error('Ошибка при инициализации карты:', error)
     }
-    
-    // Fetch problems data
-    await problemsStore.fetchProblems()
   }
 })
 
-// Initialize the map
-const initMap = () => {
-  ymaps.ready(() => {
-    // Create map instance
-    map = new ymaps.Map('map', {
-      center: [60.118891, 64.790629], // Default center (Moscow)
-      zoom: 14,
-      controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
-    })
+// Инициализация кластеризатора
+const initClusterer = () => {
+  if (!map || !window.ymaps) return
+  
+  // Создаем кластеризатор
+  clusterer = new ymaps.Clusterer({
+    preset: 'islands#blueClusterIcons',
+    groupByCoordinates: false,
+    clusterDisableClickZoom: false,
+    clusterHideIconOnBalloonOpen: false,
+    geoObjectHideIconOnBalloonOpen: false
+  })
     
-    // Create clusterer for grouping markers
-    clusterer = new ymaps.Clusterer({
-      preset: 'islands#blueClusterIcons',
-      groupByCoordinates: false,
-      clusterDisableClickZoom: false
-    })
+  map.geoObjects.add(clusterer)
     
-    map.geoObjects.add(clusterer)
-    
-    // Add problems from store to map
-    addProblemsToMap()
-    
-    // Add click event to map for adding new problems
-    map.events.add('click', (e) => {
-      formData.value = {
-        id: null,
-        coords: e.get('coords'),
-        title: '',
-        description: '',
-        status: 'Новая',
-        userName: authStore.user ? authStore.user.name : '',
-        userPhone: authStore.user ? authStore.user.phone : '',
-        imageUrl: ''
-      }
-      showForm.value = true
-    })
+  // Add click event to map for adding new problems
+  map.events.add('click', (e) => {
+    formData.value = {
+      id: null,
+      coords: e.get('coords'),
+      title: '',
+      description: '',
+      status: 'Новая',
+      userName: authStore.user ? authStore.user.name : '',
+      userPhone: authStore.user ? authStore.user.phone : '',
+      imageUrl: ''
+    }
+    showForm.value = true
   })
 }
 
