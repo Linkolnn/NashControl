@@ -1,8 +1,10 @@
 <template>
   <div class="map-container">
     <div id="map" class="map"></div>
+  </div>
     
-    <!-- Problem Form Modal -->
+  <!-- Problem Form Modal - вынесен за пределы контейнера карты -->
+  <Teleport to="body">
     <div v-if="showForm" class="problem-form-modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -120,8 +122,10 @@
         </div>
       </div>
     </div>
+  </Teleport>
     
-    <!-- Problem Details Modal -->
+  <!-- Problem Details Modal -->
+  <Teleport to="body">
     <div v-if="showProblemModal" @click="closeProblemModal" class="problem-details-modal">
       <div class="modal-content">
         <div class="modal-header">
@@ -154,7 +158,7 @@
         </div>
       </div>
     </div>
-  </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -202,7 +206,7 @@ onMounted(async () => {
       map = await $initYandexMap('map', {
         center: [60.118891, 64.790629], // Центр карты
         zoom: 14,
-        controls: ['zoomControl', 'typeSelector', 'fullscreenControl']
+        controls: ['zoomControl', 'typeSelector']
       })
       
       // Инициализируем кластеризатор после создания карты
@@ -213,6 +217,15 @@ onMounted(async () => {
       
       // Добавляем проблемы на карту
       addProblemsToMap()
+      
+      // Добавляем обработчик события изменения полноэкранного режима
+      map.container.events.add(['fullscreenenter', 'fullscreenexit'], () => {
+        // Небольшая задержка, чтобы DOM успел обновиться
+        setTimeout(() => {
+          // Перерисовываем метки после изменения полноэкранного режима
+          updateMarkers(problemsStore.problems)
+        }, 100)
+      })
     } catch (error) {
       console.error('Ошибка при инициализации карты:', error)
     }
@@ -277,7 +290,7 @@ const updateMarkers = (filteredProblems) => {
 
   // Add a single problem marker to the map
 const addProblemMarker = (problem) => {
-  if (!map || !clusterer) return
+  if (!map || !clusterer || !window.ymaps) return
   
   // Define marker colors based on status
   const markerColors = {
@@ -288,68 +301,36 @@ const addProblemMarker = (problem) => {
   
   const color = markerColors[problem.status] || 'blue'
   
-  // Create custom layout for placemark with image
-  let customLayout
+  // Создаем простой HTML-макет для метки с изображением
+  let placemarkOptions
   
   if (problem.imageUrl) {
-    // Custom layout with image
-    customLayout = ymaps.templateLayoutFactory.createClass(`
+    // Создаем макет для иконки с изображением - похожий на Umap
+    const customPlacemark = ymaps.templateLayoutFactory.createClass(`
       <div class="custom-placemark custom-placemark--${problem.status.toLowerCase().replace(' ', '-')}">
-        <div class="custom-placemark__image" style="background-image: url('${problem.imageUrl}')"></div>
-        <div class="custom-placemark__status">${problem.status}</div>
         <div class="custom-placemark__title">${problem.title}</div>
+        <div class="custom-placemark__status">${problem.status}</div>
+        <div class="custom-placemark__image" style="background-image: url('${problem.imageUrl}')"></div>
       </div>
-    `, {
-      // Переопределяем методы макета, чтобы добавить интерактивность
-      build: function() {
-        // Вызываем родительский метод build
-        customLayout.superclass.build.call(this);
-        
-        // Запоминаем ссылку на DOM-элемент, который представляет макет
-        this.element = this.getParentElement().querySelector('.custom-placemark');
-        
-        // Добавляем обработчики событий
-        this.element.addEventListener('mouseenter', this.onMouseEnter.bind(this));
-        this.element.addEventListener('mouseleave', this.onMouseLeave.bind(this));
+    `);
+    
+    placemarkOptions = {
+      iconLayout: customPlacemark,
+      iconShape: {
+        type: 'Rectangle',
+        coordinates: [[-20, -40], [20, 0]]
       },
-      
-      clear: function() {
-        // Удаляем обработчики событий
-        if (this.element) {
-          this.element.removeEventListener('mouseenter', this.onMouseEnter);
-          this.element.removeEventListener('mouseleave', this.onMouseLeave);
-        }
-        
-        // Вызываем родительский метод clear
-        customLayout.superclass.clear.call(this);
-      },
-      
-      onMouseEnter: function() {
-        // Показываем заголовок и статус при наведении
-        const title = this.element.querySelector('.custom-placemark__title');
-        const status = this.element.querySelector('.custom-placemark__status');
-        
-        if (title) title.style.opacity = '1';
-        if (status) status.style.opacity = '1';
-        
-        // Увеличиваем изображение
-        const image = this.element.querySelector('.custom-placemark__image');
-        if (image) image.style.transform = 'scale(1.1)';
-      },
-      
-      onMouseLeave: function() {
-        // Скрываем заголовок и статус при уходе курсора
-        const title = this.element.querySelector('.custom-placemark__title');
-        const status = this.element.querySelector('.custom-placemark__status');
-        
-        if (title) title.style.opacity = '0';
-        if (status) status.style.opacity = '0';
-        
-        // Возвращаем изображение к нормальному размеру
-        const image = this.element.querySelector('.custom-placemark__image');
-        if (image) image.style.transform = 'scale(1)';
-      }
-    })
+      // Важные параметры для корректной работы в полноэкранном режиме
+      hideIconOnBalloonOpen: false,
+      zIndexHover: 9999
+    }
+  } else {
+    // Для меток без изображения используем стандартные иконки
+    placemarkOptions = {
+      preset: `islands#${color}Icon`,
+      hideIconOnBalloonOpen: false,
+      zIndexHover: 9999
+    }
   }
   
   // Create placemark
@@ -360,30 +341,59 @@ const addProblemMarker = (problem) => {
       problemData: problem,
       hintContent: problem.title
     },
-    problem.imageUrl ? {
-      // Custom icon with image
-      iconLayout: customLayout,
-      iconShape: {
-        type: 'Rectangle',
-        coordinates: [[-20, -40], [20, 0]]
-      }
-    } : {
-      // Default icon without image
-      preset: `islands#${color}Icon`
-    }
+    placemarkOptions
   )
   
   // Добавляем обработчик клика на метку
   placemark.events.add('click', function(e) {
-    // Получаем данные проблемы из свойств метки
-    const problemData = placemark.properties.get('problemData')
-    
-    // Закрываем баллун, если он открыт
-    map.balloon.close()
-    
-    // Открываем модальное окно с информацией о проблеме
-    showProblemDetails(problemData)
+    try {
+      // Предотвращаем всплытие события
+      e.stopPropagation();
+      
+      // Получаем данные проблемы из свойств метки
+      const problemData = placemark.properties.get('problemData')
+      
+      // Открываем модальное окно с информацией о проблеме
+      showProblemDetails(problemData)
+    } catch (error) {
+      console.error('Ошибка при клике на метку:', error)
+    }
   })
+  
+  // Добавляем обработчики для отображения заголовка и статуса при наведении
+  if (problem.imageUrl) {
+    placemark.events.add('mouseenter', function() {
+      try {
+        const overlay = placemark.getOverlaySync();
+        if (overlay) {
+          const element = overlay.getLayoutSync().getElement();
+          const title = element.querySelector('.custom-placemark__title');
+          const status = element.querySelector('.custom-placemark__status');
+          
+          if (title) title.style.opacity = '1';
+          if (status) status.style.opacity = '1';
+        }
+      } catch (error) {
+        console.error('Ошибка при наведении на метку:', error);
+      }
+    });
+    
+    placemark.events.add('mouseleave', function() {
+      try {
+        const overlay = placemark.getOverlaySync();
+        if (overlay) {
+          const element = overlay.getLayoutSync().getElement();
+          const title = element.querySelector('.custom-placemark__title');
+          const status = element.querySelector('.custom-placemark__status');
+          
+          if (title) title.style.opacity = '0';
+          if (status) status.style.opacity = '0';
+        }
+      } catch (error) {
+        console.error('Ошибка при уходе курсора с метки:', error);
+      }
+    });
+  }
   
   // Если пользователь администратор, добавляем кнопку редактирования в модальное окно
   if (authStore.isAdmin()) {
@@ -583,6 +593,57 @@ defineExpose({
 </script>
 
 <style lang="scss" scoped>
+/* Глобальные стили для полноэкранного режима */
+:global(.ymaps-2-1-79-map-copyrights-promo) {
+  z-index: 1 !important;
+}
+
+:global(.ymaps-2-1-79-float-button) {
+  z-index: 9000 !important;
+}
+
+:global(.ymaps-2-1-79-events-pane) {
+  pointer-events: auto !important;
+}
+
+:global(.ymaps-2-1-79-balloon) {
+  z-index: 9500 !important;
+}
+
+:global(.ymaps-2-1-79-controls__control) {
+  z-index: 9000 !important;
+}
+
+:global(.ymaps-2-1-79-map) {
+  z-index: 1 !important;
+}
+
+:global(.ymaps-2-1-79-map.ymaps-2-1-79-i-ua_js_yes .ymaps-2-1-79-map-copyrights-promo) {
+  z-index: 1 !important;
+}
+
+/* Стили для полноэкранного режима */
+:global(.ymaps-2-1-79-placemark) {
+  z-index: 9999 !important;
+}
+
+:global(.ymaps-2-1-79-placemark-overlay) {
+  z-index: 9999 !important;
+}
+
+:global(.ymaps-2-1-79-islets_icon-with-caption) {
+  z-index: 9999 !important;
+}
+
+/* Стили для панели в полноэкранном режиме */
+:global(.ymaps-2-1-79-panel-pane) {
+  z-index: 9990 !important;
+}
+
+:global(.ymaps-2-1-79-gototech) {
+  z-index: 1 !important;
+}
+
 .map-container {
   position: relative;
   width: 100%;
@@ -607,7 +668,7 @@ defineExpose({
   display: flex;
   justify-content: center;
   align-items: center;
-  z-index: 1000;
+  z-index: 99999; /* Очень высокий z-index как в Umap */
   animation: fadeIn 0.3s ease;
 }
 
@@ -996,7 +1057,10 @@ defineExpose({
   position: relative;
   width: 40px;
   height: 40px;
-  transform: translate(-50%, -100%)
+  transform: translate(-50%, -100%);
+  z-index: 9999 !important; /* Очень высокий z-index для отображения в полноэкранном режиме */
+  pointer-events: auto !important; /* Важно для работы в полноэкранном режиме */
+  cursor: pointer;
 }
 
 :deep(.custom-placemark__image) {
@@ -1008,32 +1072,13 @@ defineExpose({
   border: 2px solid white;
   box-shadow: 0 2px 5px rgba(0, 0, 0, 0.3);
   transition: transform 0.2s;
-}
-
-:deep(.custom-placemark__image:hover) {
-  transform: scale(1.1);
-}
-
-:deep(.custom-placemark__status) {
-  position: absolute;
-  bottom: -5px;
-  right: -5px;
-  background-color: white;
-  color: white;
-  font-size: 10px;
-  font-weight: bold;
-  padding: 2px 5px;
-  border-radius: 10px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
-  white-space: nowrap;
-  opacity: 0;
-  transform: translateY(5px);
-  transition: opacity 0.2s, transform 0.2s;
+  position: relative;
+  z-index: 9999 !important; /* Очень высокий z-index для отображения в полноэкранном режиме */
 }
 
 :deep(.custom-placemark__title) {
   position: absolute;
-  top: -25px;
+  top: -30px;
   left: 50%;
   transform: translateX(-50%);
   background-color: white;
@@ -1049,7 +1094,116 @@ defineExpose({
   max-width: 150px;
   overflow: hidden;
   text-overflow: ellipsis;
-  z-index: 1;
+  z-index: 10000 !important; /* Еще более высокий z-index для заголовка */
+  pointer-events: none; /* Чтобы не мешало клику на метку */
+}
+
+:deep(.custom-placemark__status) {
+  position: absolute;
+  bottom: -5px;
+  right: -5px;
+  background-color: white;
+  padding: 2px 5px;
+  border-radius: 10px;
+  font-size: 10px;
+  font-weight: bold;
+  white-space: nowrap;
+  opacity: 0;
+  transition: opacity 0.2s;
+  z-index: 10000 !important; /* Еще более высокий z-index для статуса */
+  pointer-events: none; /* Чтобы не мешало клику на метку */
+}
+
+:deep(.custom-placemark--новая .custom-placemark__status) {
+  background-color: #ffebee;
+  color: #f44336;
+}
+
+:deep(.custom-placemark--в-работе .custom-placemark__status) {
+  background-color: #fff8e1;
+  color: #ff9800;
+}
+
+:deep(.custom-placemark--исправлено .custom-placemark__status) {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+:deep(.custom-placemark:hover .custom-placemark__image) {
+  transform: scale(1.1);
+}
+
+/* Стили для баллунов */
+:global(.balloon-content) {
+  padding: 15px;
+  max-width: 300px;
+}
+
+:global(.balloon-title) {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: var(--primary-color);
+}
+
+:global(.balloon-status) {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 10px;
+}
+
+:global(.status-новая) {
+  background-color: #ffebee;
+  color: #f44336;
+}
+
+:global(.status-в-работе) {
+  background-color: #fff8e1;
+  color: #ff9800;
+}
+
+:global(.status-исправлено) {
+  background-color: #e8f5e9;
+  color: #4caf50;
+}
+
+:global(.balloon-image) {
+  margin: 10px 0;
+  text-align: center;
+  
+  img {
+    max-width: 100%;
+    max-height: 150px;
+    border-radius: 6px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  }
+}
+
+:global(.balloon-description) {
+  font-size: 14px;
+  line-height: 1.4;
+  margin-bottom: 15px;
+  color: #333;
+}
+
+:global(.balloon-details-btn) {
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 8px 15px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background-color 0.2s;
+  width: 100%;
+  
+  &:hover {
+    background-color: darken(#2196F3, 10%);
+  }
 }
 
 :deep(.custom-placemark:hover .custom-placemark__status) {
@@ -1068,25 +1222,31 @@ defineExpose({
 /* Status-specific styles */
 :deep(.custom-placemark--новая .custom-placemark__image) {
   border-color: #f44336;
+  color: #fff;
 }
 
 :deep(.custom-placemark--новая .custom-placemark__status) {
   background-color: #f44336;
+  color: #fff;
 }
 
 :deep(.custom-placemark--в-работе .custom-placemark__image) {
   border-color: #ff9800;
+  color: #fff;
 }
 
 :deep(.custom-placemark--в-работе .custom-placemark__status) {
   background-color: #ff9800;
+  color: #fff;
 }
 
 :deep(.custom-placemark--исправлено .custom-placemark__image) {
   border-color: #4CAF50;
+  color: #fff;
 }
 
 :deep(.custom-placemark--исправлено .custom-placemark__status) {
   background-color: #4CAF50;
+  color: #fff;
 }
 </style>

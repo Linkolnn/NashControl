@@ -5,7 +5,7 @@
       <p>Нажмите на карту, чтобы отметить проблему, или выберите существующую метку для просмотра деталей</p>
     </div>
     
-    <!-- Мобильная кнопка для показа/скрытия фильтров -->
+    <!-- Кнопка для показа/скрытия фильтров -->
     <button 
       class="toggle-filters-btn" 
       @click="toggleFilters"
@@ -15,17 +15,24 @@
     </button>
     
     <div class="map-content">
-      <!-- Новый компонент фильтров -->
-      <div 
-        class="filters-panel" 
-        :class="{ 'show': showFilters }"
-      >
-        <MapFilters @filter-change="applyFilters" />
-      </div>
-      
       <!-- Контейнер карты -->
       <div class="map-container">
         <MapComponent ref="mapComponent" />
+      </div>
+    </div>
+    
+    <!-- Панель фильтров (появляется по нажатию на кнопку) -->
+    <div 
+      class="filters-overlay" 
+      v-if="showFilters"
+      @click.self="toggleFilters"
+    >
+      <div class="filters-panel">
+        <div class="filters-header">
+          <h3>Фильтры</h3>
+          <button class="close-filters-btn" @click="toggleFilters">&times;</button>
+        </div>
+        <MapFilters @filter-change="applyFilters" />
       </div>
     </div>
     
@@ -246,9 +253,9 @@ const resetFilters = () => {
   }
 }
 
-// Кнопка переключения фильтров на мобильных устройствах
+// Кнопка переключения фильтров
 .toggle-filters-btn {
-  display: none;
+  display: flex;
   background-color: var(--primary-color);
   color: white;
   border: none;
@@ -272,10 +279,6 @@ const resetFilters = () => {
   &.active {
     background-color: darken(#2196F3, 15%);
   }
-  
-  @media (max-width: 768px) {
-    display: flex;
-  }
 }
 
 // Контейнер для карты и фильтров
@@ -289,43 +292,67 @@ const resetFilters = () => {
   }
 }
 
+// Оверлей для фильтров
+.filters-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 1000;
+  padding: 20px;
+}
+
 // Панель фильтров
 .filters-panel {
-  width: 300px;
-  flex-shrink: 0;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+  padding: 20px;
+  width: 100%;
+  max-width: 400px;
+  max-height: 80vh;
+  overflow-y: auto;
   
-  @media (max-width: 768px) {
-    width: 100%;
-    display: none;
+  .filters-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
     margin-bottom: 15px;
     
-    &.show {
-      display: block;
-      animation: slideDown 0.3s ease;
+    h3 {
+      margin: 0;
+      color: var(--primary-color);
+      font-size: 1.3rem;
+    }
+    
+    .close-filters-btn {
+      background: none;
+      border: none;
+      font-size: 1.8rem;
+      line-height: 1;
+      color: #999;
+      cursor: pointer;
+      padding: 0;
+      
+      &:hover {
+        color: var(--danger-color);
+      }
     }
   }
 }
 
-@keyframes slideDown {
-  from { opacity: 0; transform: translateY(-10px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
 // Контейнер карты
 .map-container {
-  flex: 1;
-  height: 500px;
+  flex-grow: 1;
+  height: 90vh;
   border-radius: 8px;
   overflow: hidden;
   box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
-  
-  @media (max-width: 768px) {
-    height: 400px;
-  }
-  
-  @media (max-width: 480px) {
-    height: 350px;
-  }
 }
 
 .map-stats {

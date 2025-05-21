@@ -1,6 +1,5 @@
 <template>
   <div class="map-filters">
-    <h3 class="filters-title">Фильтры</h3>
     
     <div class="filter-group">
       <label>Статус проблемы</label>
