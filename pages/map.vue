@@ -5,24 +5,28 @@
       <p>Нажмите на карту, чтобы отметить проблему, или выберите существующую метку для просмотра деталей</p>
     </div>
     
-    <div class="map-filters">
-      <div class="filter-group">
-        <label for="status-filter">Фильтр по статусу:</label>
-        <select id="status-filter" v-model="statusFilter">
-          <option value="all">Все статусы</option>
-          <option value="Новая">Новые</option>
-          <option value="В работе">В работе</option>
-          <option value="Исправлено">Исправленные</option>
-        </select>
+    <!-- Мобильная кнопка для показа/скрытия фильтров -->
+    <button 
+      class="toggle-filters-btn" 
+      @click="toggleFilters"
+      :class="{ 'active': showFilters }"
+    >
+      <i class="fas fa-filter"></i> Фильтры
+    </button>
+    
+    <div class="map-content">
+      <!-- Новый компонент фильтров -->
+      <div 
+        class="filters-panel" 
+        :class="{ 'show': showFilters }"
+      >
+        <MapFilters @filter-change="applyFilters" />
       </div>
       
-      <div class="filter-group">
-        <button @click="resetFilters" class="btn btn-outline btn-primary">Сбросить фильтры</button>
+      <!-- Контейнер карты -->
+      <div class="map-container">
+        <MapComponent ref="mapComponent" />
       </div>
-    </div>
-    
-    <div class="map-container">
-      <MapComponent />
     </div>
     
     <div class="map-stats">
@@ -64,41 +68,123 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
-import { useProblemsStore } from '@/stores/problems'
-
-definePageMeta({
-  layout: 'default'
-})
+import { ref, computed, onMounted, nextTick } from 'vue'
+import { useProblemsStore } from '~/stores/problems'
+import MapFilters from '~/components/MapFilters.vue'
+import MapComponent from '~/components/MapComponent.vue'
 
 const problemsStore = useProblemsStore()
+const mapComponent = ref(null)
+
+// Состояние отображения фильтров (для мобильной версии)
+const showFilters = ref(window?.innerWidth >= 768) // По умолчанию показываем на десктопе
+
+// Fetch problems when component is mountedProblemsStore()
 const statusFilter = ref('all')
 
 // Fetch problems when component is mounted
-onMounted(async () => {
-  await problemsStore.fetchProblems()
+
+// Переключение отображения фильтров
+const toggleFilters = () => {
+  showFilters.value = !showFilters.value
+}
+
+// Применение фильтров из компонента MapFilters
+const activeFilters = ref({
+  status: {
+    new: true,
+    inProgress: true,
+    fixed: true
+  },
+  date: {
+    from: null,
+    to: null
+  },
+  search: ''
 })
 
-// Computed properties for filtered problems
-const filteredProblems = computed(() => {
-  if (statusFilter.value === 'all') {
-    return problemsStore.problems
-  }
-  return problemsStore.problems.filter(p => p.status === statusFilter.value)
-})
+// Обработчик изменения фильтров
+const applyFilters = (filters) => {
+  activeFilters.value = filters
+  
+  // Обновляем метки на карте с применением фильтров
+  updateMapMarkers()
+}
 
-// Statistics
+// Вычисляемые свойства для статистики
 const totalProblems = computed(() => problemsStore.problems.length)
 const newProblems = computed(() => problemsStore.problems.filter(p => p.status === 'Новая').length)
 const inProgressProblems = computed(() => problemsStore.problems.filter(p => p.status === 'В работе').length)
 const resolvedProblems = computed(() => problemsStore.problems.filter(p => p.status === 'Исправлено').length)
 
-// Recent problems (last 5)
+// Недавние проблемы (последние 5)
 const recentProblems = computed(() => {
   return [...problemsStore.problems]
     .sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
     .slice(0, 5)
 })
+
+// Фильтрованные проблемы
+const filteredProblems = computed(() => {
+  return problemsStore.problems.filter(problem => {
+    // Фильтр по статусу
+    const statusMatch = 
+      (activeFilters.value.status.new && problem.status === 'Новая') ||
+      (activeFilters.value.status.inProgress && problem.status === 'В работе') ||
+      (activeFilters.value.status.fixed && problem.status === 'Исправлено')
+    
+    // Фильтр по дате
+    let dateMatch = true
+    if (activeFilters.value.date.from) {
+      dateMatch = dateMatch && new Date(problem.createdAt) >= activeFilters.value.date.from
+    }
+    if (activeFilters.value.date.to) {
+      dateMatch = dateMatch && new Date(problem.createdAt) <= activeFilters.value.date.to
+    }
+    
+    // Фильтр по поиску
+    let searchMatch = true
+    if (activeFilters.value.search) {
+      const searchTerm = activeFilters.value.search.toLowerCase()
+      searchMatch = 
+        problem.title.toLowerCase().includes(searchTerm) ||
+        problem.description.toLowerCase().includes(searchTerm)
+    }
+    
+    return statusMatch && dateMatch && searchMatch
+  })
+})
+
+// Функция обновления меток на карте в соответствии с фильтрами
+const updateMapMarkers = () => {
+  // Если есть ссылка на компонент карты, вызываем метод обновления меток
+  if (mapComponent.value) {
+    mapComponent.value.updateMarkers(filteredProblems.value)
+  }
+}
+
+// Адаптивность: отслеживание изменения размера окна
+onMounted(async () => {
+  await problemsStore.fetchProblems()
+  
+  // Обновляем метки на карте после загрузки проблем
+  nextTick(() => {
+    updateMapMarkers()
+  })
+  
+  // Обработчик изменения размера окна
+  window.addEventListener('resize', handleResize)
+})
+
+// Обработчик изменения размера окна
+const handleResize = () => {
+  // Автоматически показываем фильтры на десктопе и скрываем на мобильных
+  if (window.innerWidth >= 768 && !showFilters.value) {
+    showFilters.value = true
+  } else if (window.innerWidth < 768 && showFilters.value) {
+    showFilters.value = false
+  }
+}
 
 // Format date
 const formatDate = (dateString) => {
@@ -133,6 +219,7 @@ const resetFilters = () => {
 <style lang="scss" scoped>
 .map-page {
   padding-bottom: 50px;
+  position: relative;
 }
 
 .map-header {
@@ -140,47 +227,105 @@ const resetFilters = () => {
   text-align: center;
   
   h1 {
-    font-size: 2.2rem;
     color: var(--primary-color);
     margin-bottom: 10px;
+    
+    @media (max-width: 768px) {
+      font-size: 1.8rem;
+    }
   }
   
   p {
     color: var(--dark-gray);
-    font-size: 1.1rem;
+    max-width: 700px;
+    margin: 0 auto;
+    
+    @media (max-width: 768px) {
+      font-size: 0.9rem;
+    }
   }
 }
 
-.map-filters {
-  display: flex;
-  justify-content: space-between;
+// Кнопка переключения фильтров на мобильных устройствах
+.toggle-filters-btn {
+  display: none;
+  background-color: var(--primary-color);
+  color: white;
+  border: none;
+  padding: 10px 15px;
+  border-radius: 4px;
+  font-weight: 500;
+  cursor: pointer;
+  margin-bottom: 15px;
   align-items: center;
-  margin-bottom: 20px;
+  gap: 8px;
+  transition: background-color 0.2s;
   
-  .filter-group {
+  i {
+    font-size: 14px;
+  }
+  
+  &:hover {
+    background-color: darken(#2196F3, 10%);
+  }
+  
+  &.active {
+    background-color: darken(#2196F3, 15%);
+  }
+  
+  @media (max-width: 768px) {
     display: flex;
-    align-items: center;
-    gap: 10px;
+  }
+}
+
+// Контейнер для карты и фильтров
+.map-content {
+  display: flex;
+  gap: 20px;
+  margin-bottom: 30px;
+  
+  @media (max-width: 768px) {
+    flex-direction: column;
+  }
+}
+
+// Панель фильтров
+.filters-panel {
+  width: 300px;
+  flex-shrink: 0;
+  
+  @media (max-width: 768px) {
+    width: 100%;
+    display: none;
+    margin-bottom: 15px;
     
-    label {
-      font-weight: 500;
-    }
-    
-    select {
-      padding: 8px 12px;
-      border-radius: 4px;
-      border: 1px solid var(--border-color);
-      background-color: white;
+    &.show {
+      display: block;
+      animation: slideDown 0.3s ease;
     }
   }
 }
 
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+// Контейнер карты
 .map-container {
-  height: 600px;
-  margin-bottom: 30px;
+  flex: 1;
+  height: 500px;
   border-radius: 8px;
   overflow: hidden;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  
+  @media (max-width: 768px) {
+    height: 400px;
+  }
+  
+  @media (max-width: 480px) {
+    height: 350px;
+  }
 }
 
 .map-stats {

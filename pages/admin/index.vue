@@ -22,24 +22,88 @@
     </div>
     
     <div class="admin-filters">
+      <h3 class="filters-title">Фильтры</h3>
+      
       <div class="filter-group">
-        <label for="status-filter">Фильтр по статусу:</label>
-        <select id="status-filter" v-model="statusFilter">
-          <option value="all">Все статусы</option>
-          <option value="Новая">Новые</option>
-          <option value="В работе">В работе</option>
-          <option value="Исправлено">Исправленные</option>
-        </select>
+        <label>Статус проблемы</label>
+        <div class="checkbox-group">
+          <div class="checkbox-item">
+            <input 
+              type="checkbox" 
+              id="status-new" 
+              :checked="statusFilter === 'all' || statusFilter === 'Новая'"
+              @change="toggleStatus('Новая')"
+            >
+            <label for="status-new">
+              <span class="status-badge status-new">Новая</span>
+            </label>
+          </div>
+          
+          <div class="checkbox-item">
+            <input 
+              type="checkbox" 
+              id="status-in-progress" 
+              :checked="statusFilter === 'all' || statusFilter === 'В работе'"
+              @change="toggleStatus('В работе')"
+            >
+            <label for="status-in-progress">
+              <span class="status-badge status-in-progress">В работе</span>
+            </label>
+          </div>
+          
+          <div class="checkbox-item">
+            <input 
+              type="checkbox" 
+              id="status-fixed" 
+              :checked="statusFilter === 'all' || statusFilter === 'Исправлено'"
+              @change="toggleStatus('Исправлено')"
+            >
+            <label for="status-fixed">
+              <span class="status-badge status-fixed">Исправлено</span>
+            </label>
+          </div>
+        </div>
       </div>
       
       <div class="filter-group">
-        <label for="search">Поиск:</label>
+        <label>Дата добавления</label>
+        <div class="date-range">
+          <div class="date-input">
+            <label for="date-from">От</label>
+            <input 
+              id="date-from" 
+              v-model="dateFilter.from" 
+              type="date" 
+              @change="applyFilters"
+            >
+          </div>
+          
+          <div class="date-input">
+            <label for="date-to">До</label>
+            <input 
+              id="date-to" 
+              v-model="dateFilter.to" 
+              type="date" 
+              @change="applyFilters"
+            >
+          </div>
+        </div>
+      </div>
+      
+      <div class="filter-group">
+        <label for="search">Поиск по названию</label>
         <input 
           id="search" 
           v-model="searchQuery" 
           type="text" 
-          placeholder="Поиск по названию или описанию"
+          placeholder="Введите текст для поиска"
         >
+      </div>
+      
+      <div class="filter-actions">
+        <button @click="resetFilters" class="reset-btn">
+          <i class="fas fa-undo"></i> Сбросить фильтры
+        </button>
       </div>
     </div>
     
@@ -56,7 +120,7 @@
           </tr>
         </thead>
         <tbody>
-          <tr v-for="problem in filteredProblems" :key="problem.id">
+          <tr v-for="problem in filteredProblems" :key="problem.id" @click="viewProblem(problem)">
             <td>{{ problem.id }}</td>
             <td>{{ problem.title }}</td>
             <td>
@@ -195,6 +259,10 @@ definePageMeta({
 const problemsStore = useProblemsStore()
 const statusFilter = ref('all')
 const searchQuery = ref('')
+const dateFilter = ref({
+  from: '',
+  to: ''
+})
 const selectedProblem = ref(null)
 const isEditing = ref(false)
 const editForm = ref({
@@ -209,26 +277,64 @@ onMounted(async () => {
   await problemsStore.fetchProblems()
 })
 
+// Функция для переключения статуса фильтра
+const toggleStatus = (status) => {
+  if (statusFilter.value === status) {
+    // Если текущий фильтр равен выбранному статусу, сбрасываем фильтр на 'all'
+    statusFilter.value = 'all'
+  } else {
+    // Иначе устанавливаем фильтр на выбранный статус
+    statusFilter.value = status
+  }
+}
+
+// Функция для применения фильтров
+const applyFilters = () => {
+  // Эта функция вызывается при изменении фильтров даты
+  // Она не требует дополнительной логики, так как фильтрация происходит в computed свойстве
+}
+
+// Функция для сброса всех фильтров
+const resetFilters = () => {
+  statusFilter.value = 'all'
+  searchQuery.value = ''
+  dateFilter.value.from = ''
+  dateFilter.value.to = ''
+}
+
 // Computed properties for filtered problems
 const filteredProblems = computed(() => {
-  let filtered = problemsStore.problems
+  let result = [...problemsStore.problems]
   
   // Apply status filter
   if (statusFilter.value !== 'all') {
-    filtered = filtered.filter(p => p.status === statusFilter.value)
+    result = result.filter(problem => problem.status === statusFilter.value)
+  }
+  
+  // Apply date filters
+  if (dateFilter.value.from) {
+    const fromDate = new Date(dateFilter.value.from)
+    fromDate.setHours(0, 0, 0, 0) // Устанавливаем время на начало дня
+    result = result.filter(problem => new Date(problem.createdAt) >= fromDate)
+  }
+  
+  if (dateFilter.value.to) {
+    const toDate = new Date(dateFilter.value.to)
+    toDate.setHours(23, 59, 59, 999) // Устанавливаем время на конец дня
+    result = result.filter(problem => new Date(problem.createdAt) <= toDate)
   }
   
   // Apply search filter
-  if (searchQuery.value.trim()) {
+  if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(p => 
-      p.title.toLowerCase().includes(query) || 
-      p.description.toLowerCase().includes(query)
+    result = result.filter(problem => 
+      problem.title.toLowerCase().includes(query) || 
+      problem.description.toLowerCase().includes(query)
     )
   }
   
   // Sort by creation date (newest first)
-  return [...filtered].sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
+  return result.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
 })
 
 // Statistics
@@ -394,27 +500,158 @@ const closeModal = () => {
 }
 
 .admin-filters {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 20px;
+  background-color: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  padding: 20px;
+  width: 100%;
   margin-bottom: 20px;
   
+  @media (max-width: 768px) {
+    padding: 15px;
+  }
+  
+  .filters-title {
+    margin-top: 0;
+    margin-bottom: 20px;
+    color: var(--primary-color);
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  
   .filter-group {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+    margin-bottom: 20px;
     
-    label {
+    > label {
+      display: block;
+      margin-bottom: 8px;
       font-weight: 500;
-      white-space: nowrap;
+      color: #333;
     }
     
-    select, input {
-      padding: 8px 12px;
+    input[type="text"] {
+      width: 100%;
+      padding: 10px 12px;
       border-radius: 4px;
       border: 1px solid var(--border-color);
-      background-color: white;
-      min-width: 200px;
+      font-size: 0.9rem;
+      
+      &:focus {
+        outline: none;
+        border-color: var(--primary-color);
+        box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+      }
+    }
+  }
+  
+  .checkbox-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 8px;
+    }
+    
+    .checkbox-item {
+      display: flex;
+      align-items: center;
+      
+      input[type="checkbox"] {
+        margin-right: 6px;
+      }
+    }
+  }
+  
+  .date-range {
+    display: flex;
+    gap: 15px;
+    
+    @media (max-width: 768px) {
+      flex-direction: column;
+      gap: 10px;
+    }
+    
+    .date-input {
+      flex: 1;
+      
+      label {
+        display: block;
+        margin-bottom: 5px;
+        font-size: 0.85rem;
+        color: var(--dark-gray);
+      }
+      
+      input[type="date"] {
+        width: 100%;
+        padding: 8px 10px;
+        border-radius: 4px;
+        border: 1px solid var(--border-color);
+        font-size: 0.9rem;
+        
+        &:focus {
+          outline: none;
+          border-color: var(--primary-color);
+          box-shadow: 0 0 0 2px rgba(33, 150, 243, 0.1);
+        }
+      }
+    }
+  }
+  
+  .status-badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 0.85rem;
+    font-weight: 500;
+    
+    &.status-new {
+      background-color: #ffebee;
+      color: #f44336;
+    }
+    
+    &.status-in-progress {
+      background-color: #fff8e1;
+      color: #ff9800;
+    }
+    
+    &.status-fixed {
+      background-color: #e8f5e9;
+      color: #4caf50;
+    }
+  }
+  
+  .filter-actions {
+    display: flex;
+    justify-content: flex-end;
+    margin-top: 15px;
+    
+    @media (max-width: 768px) {
+      justify-content: center;
+    }
+    
+    .reset-btn {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background-color: transparent;
+      color: var(--dark-gray);
+      border: 1px solid var(--border-color);
+      padding: 8px 15px;
+      border-radius: 4px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      
+      &:hover {
+        background-color: #f5f5f5;
+        border-color: #ccc;
+      }
+      
+      i {
+        font-size: 0.8rem;
+      }
     }
   }
 }

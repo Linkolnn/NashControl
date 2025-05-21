@@ -158,7 +158,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, defineExpose } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProblemsStore } from '@/stores/problems'
 
@@ -257,6 +257,20 @@ const addProblemsToMap = () => {
   clusterer.removeAll()
   
   problemsStore.problems.forEach(problem => {
+    addProblemMarker(problem)
+  })
+}
+
+// Обновление меток на карте в соответствии с фильтрами
+// Этот метод будет вызываться из родительского компонента при изменении фильтров
+const updateMarkers = (filteredProblems) => {
+  if (!map || !clusterer) return
+  
+  // Удаляем все текущие метки
+  clusterer.removeAll()
+  
+  // Добавляем только отфильтрованные проблемы
+  filteredProblems.forEach(problem => {
     addProblemMarker(problem)
   })
 }
@@ -561,6 +575,11 @@ const deleteProblemFromModal = async (id) => {
     }
   }
 }
+
+// Экспортируем методы для использования в родительском компоненте
+defineExpose({
+  updateMarkers
+})
 </script>
 
 <style lang="scss" scoped>

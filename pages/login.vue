@@ -121,10 +121,21 @@ const login = async () => {
   width: 100%;
   max-width: 400px;
   
+  @media (max-width: 480px) {
+    padding: 20px;
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+  }
+  
   h1 {
     text-align: center;
     margin-bottom: 30px;
     color: var(--primary-color);
+    font-size: 1.8rem;
+    
+    @media (max-width: 480px) {
+      font-size: 1.5rem;
+      margin-bottom: 20px;
+    }
   }
 }
 
