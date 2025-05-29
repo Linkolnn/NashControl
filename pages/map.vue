@@ -58,7 +58,12 @@
     <div class="recent-problems">
       <h2>Недавние проблемы</h2>
       <div class="problems-list">
-        <div v-for="problem in recentProblems" :key="problem.id" class="problem-card">
+        <div 
+          v-for="problem in recentProblems" 
+          :key="problem.id" 
+          class="problem-card"
+          @click="navigateToProblem(problem.id)"
+        >
           <div class="problem-status" :class="getStatusClass(problem.status)">
             {{ problem.status }}
           </div>
@@ -84,7 +89,8 @@ const problemsStore = useProblemsStore()
 const mapComponent = ref(null)
 
 // Состояние отображения фильтров (для мобильной версии)
-const showFilters = ref(window?.innerWidth >= 768) // По умолчанию показываем на десктопе
+// Сначала скрываем фильтры для исключения проблем с гидратацией
+const showFilters = ref(false)
 
 // Fetch problems when component is mountedProblemsStore()
 const statusFilter = ref('all')
@@ -179,17 +185,24 @@ onMounted(async () => {
     updateMapMarkers()
   })
   
+  // Устанавливаем начальное состояние фильтров на клиенте
+  // Это исключит проблемы с гидратацией, так как начальное состояние на сервере и клиенте будет одинаковым
+  handleResize()
+  
   // Обработчик изменения размера окна
   window.addEventListener('resize', handleResize)
 })
 
 // Обработчик изменения размера окна
 const handleResize = () => {
-  // Автоматически показываем фильтры на десктопе и скрываем на мобильных
-  if (window.innerWidth >= 768 && !showFilters.value) {
-    showFilters.value = true
-  } else if (window.innerWidth < 768 && showFilters.value) {
-    showFilters.value = false
+  // Проверяем, что window доступен (только на клиенте)
+  if (typeof window !== 'undefined') {
+    // Автоматически показываем фильтры на десктопе и скрываем на мобильных
+    if (window.innerWidth >= 768) {
+      showFilters.value = true
+    } else {
+      showFilters.value = false
+    }
   }
 }
 
@@ -201,6 +214,11 @@ const formatDate = (dateString) => {
     month: '2-digit',
     year: 'numeric'
   })
+}
+
+// Функция для перехода на страницу подробной информации о проблеме
+const navigateToProblem = (problemId) => {
+  navigateTo(`/problem/${problemId}`)
 }
 
 // Get status class for styling
@@ -409,6 +427,18 @@ const resetFilters = () => {
     box-shadow: 0 4px 10px rgba(0, 0, 0, 0.05);
     position: relative;
     overflow: hidden;
+    cursor: pointer;
+    transition: transform 0.2s, box-shadow 0.2s;
+    
+    &:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    
+    &:active {
+      transform: translateY(-1px);
+      box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12);
+    }
     
     .problem-status {
       position: absolute;
@@ -435,18 +465,16 @@ const resetFilters = () => {
     h3 {
       margin-top: 10px;
       margin-bottom: 10px;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
+      color: var(--dark-color);
     }
     
     p {
-      color: var(--text-color);
+      color: var(--dark-gray);
       margin-bottom: 15px;
-      font-size: 0.95rem;
-      line-height: 1.5;
-      
-      // Truncate long descriptions
+      font-size: 0.9rem;
       display: -webkit-box;
-      -webkit-line-clamp: 3;
+      -webkit-line-clamp: 2;
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -454,10 +482,8 @@ const resetFilters = () => {
     .problem-meta {
       display: flex;
       justify-content: space-between;
-      font-size: 0.85rem;
-      color: var(--dark-gray);
-      border-top: 1px solid var(--border-color);
-      padding-top: 10px;
+      font-size: 0.8rem;
+      color: var(--medium-gray);
     }
   }
 }

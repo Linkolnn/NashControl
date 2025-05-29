@@ -166,6 +166,30 @@ import { ref, onMounted, computed, defineExpose } from 'vue'
 import { useAuthStore } from '@/stores/auth'
 import { useProblemsStore } from '@/stores/problems'
 
+// Props для компонента
+const props = defineProps({
+  // Начальный центр карты
+  initialCenter: {
+    type: Array,
+    default: () => [60.118891, 64.790629]
+  },
+  // Начальный зум карты
+  initialZoom: {
+    type: Number,
+    default: 14
+  },
+  // Режим только для чтения (без возможности добавления/редактирования)
+  readOnly: {
+    type: Boolean,
+    default: false
+  },
+  // Одна проблема для отображения (для страницы подробной информации)
+  singleProblem: {
+    type: Object,
+    default: null
+  }
+})
+
 // Состояние модального окна с деталями проблемы
 const showProblemModal = ref(false)
 const selectedProblem = ref(null)
@@ -197,40 +221,10 @@ const generateId = () => {
 // Получаем доступ к плагину Яндекс Карт
 const { $initYandexMap } = useNuxtApp()
 
-// Initialize map when component is mounted
-onMounted(async () => {
-  if (typeof window !== 'undefined') {
-    // Инициализируем карту с помощью плагина
-    try {
-      // Создаем карту с помощью нашего плагина
-      map = await $initYandexMap('map', {
-        center: [60.118891, 64.790629], // Центр карты
-        zoom: 14,
-        controls: ['zoomControl', 'typeSelector']
-      })
-      
-      // Инициализируем кластеризатор после создания карты
-      initClusterer()
-      
-      // Fetch problems data
-      await problemsStore.fetchProblems()
-      
-      // Добавляем проблемы на карту
-      addProblemsToMap()
-      
-      // Добавляем обработчик события изменения полноэкранного режима
-      map.container.events.add(['fullscreenenter', 'fullscreenexit'], () => {
-        // Небольшая задержка, чтобы DOM успел обновиться
-        setTimeout(() => {
-          // Перерисовываем метки после изменения полноэкранного режима
-          updateMarkers(problemsStore.problems)
-        }, 100)
-      })
-    } catch (error) {
-      console.error('Ошибка при инициализации карты:', error)
-    }
-  }
-})
+// Функция для перехода на страницу подробной информации о проблеме
+const navigateToProblemDetails = (problemId) => {
+  navigateTo(`/problem/${problemId}`)
+}
 
 // Инициализация кластеризатора
 const initClusterer = () => {
@@ -244,24 +238,65 @@ const initClusterer = () => {
     clusterHideIconOnBalloonOpen: false,
     geoObjectHideIconOnBalloonOpen: false
   })
-    
+  
   map.geoObjects.add(clusterer)
-    
-  // Add click event to map for adding new problems
-  map.events.add('click', (e) => {
-    formData.value = {
-      id: null,
-      coords: e.get('coords'),
-      title: '',
-      description: '',
-      status: 'Новая',
-      userName: authStore.user ? authStore.user.name : '',
-      userPhone: authStore.user ? authStore.user.phone : '',
-      imageUrl: ''
-    }
-    showForm.value = true
-  })
 }
+
+// Initialize map when component is mounted
+onMounted(async () => {
+  if (typeof window !== 'undefined') {
+    // Инициализируем карту с помощью плагина
+    try {
+      // Создаем карту с помощью нашего плагина
+      map = await $initYandexMap('map', {
+        center: props.initialCenter, // Используем начальный центр из props
+        zoom: props.initialZoom, // Используем начальный зум из props
+        controls: ['zoomControl', 'typeSelector']
+      })
+      
+      // Если карта в режиме только для чтения и есть одна проблема для отображения
+      if (props.readOnly && props.singleProblem) {
+        // Добавляем одну метку на карту
+        addProblemMarker(props.singleProblem)
+      } else {
+        // Инициализируем кластеризатор после создания карты
+        initClusterer()
+        
+        // Fetch problems data
+        await problemsStore.fetchProblems()
+        
+        // Добавляем проблемы на карту
+        addProblemsToMap()
+        
+        // Добавляем обработчик события изменения полноэкранного режима
+        map.container.events.add(['fullscreenenter', 'fullscreenexit'], () => {
+          // Небольшая задержка, чтобы DOM успел обновиться
+          setTimeout(() => {
+            // Перерисовываем метки после изменения полноэкранного режима
+            updateMarkers(problemsStore.problems)
+          }, 100)
+        })
+        
+        // Добавляем обработчик клика по карте для добавления новой проблемы
+        if (!props.readOnly) {
+          map.events.add('click', function(e) {
+            // Получаем координаты клика
+            const coords = e.get('coords')
+            
+            // Открываем форму добавления проблемы
+            // Используем функцию из компонента
+            formData.value.coords = coords
+            showForm.value = true
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Ошибка при инициализации карты:', error)
+    }
+  }
+})
+
+// Дублирующий код удален, т.к. эта функциональность уже реализована внутри onMounted
 
 // Add all problems from store to map
 const addProblemsToMap = () => {
@@ -290,7 +325,7 @@ const updateMarkers = (filteredProblems) => {
 
   // Add a single problem marker to the map
 const addProblemMarker = (problem) => {
-  if (!map || !clusterer || !window.ymaps) return
+  if (!map || !window.ymaps) return
   
   // Define marker colors based on status
   const markerColors = {
@@ -353,8 +388,13 @@ const addProblemMarker = (problem) => {
       // Получаем данные проблемы из свойств метки
       const problemData = placemark.properties.get('problemData')
       
-      // Открываем модальное окно с информацией о проблеме
-      showProblemDetails(problemData)
+      // Если карта находится в режиме только для чтения (на странице подробной информации), то не делаем ничего
+      if (props.readOnly) {
+        return;
+      }
+      
+      // Переходим на страницу подробной информации о проблеме
+      navigateToProblemDetails(problemData.id)
     } catch (error) {
       console.error('Ошибка при клике на метку:', error)
     }
@@ -408,7 +448,14 @@ const addProblemMarker = (problem) => {
       }, 100)
     }
   
-  clusterer.add(placemark)
+  // Добавляем метку на карту
+  if (clusterer && !props.readOnly) {
+    // В обычном режиме добавляем в кластеризатор
+    clusterer.add(placemark)
+  } else {
+    // В режиме "только для чтения" добавляем напрямую на карту
+    map.geoObjects.add(placemark)
+  }
 }
 
 // Save problem data
